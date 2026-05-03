@@ -3,6 +3,7 @@ const { pool } = require('./db');
 const ordersRouter = require('./routes/orders');
 const billsRouter = require('./routes/bills');
 const paymentsRouter = require('./routes/payments');
+const outletsRouter = require('./routes/outlets');
 
 const app = express();
 app.use(express.json());
@@ -16,6 +17,7 @@ app.get('/health', async (req, res) => {
   }
 });
 
+app.use('/outlets', outletsRouter);
 app.use('/orders', ordersRouter);
 app.use('/bills', billsRouter);
 app.use('/payments', paymentsRouter);

@@ -97,4 +97,15 @@ async function generateBill(order_id, discount = null) {
     client.release();
   }
 }
-module.exports = { generateBill ,ValidationError, NotFoundError, ConflictError };
+async function getBillByOrderId(order_id) {
+  const result = await pool.query(
+    'SELECT * FROM bills WHERE order_id = $1',
+    [order_id]
+  );
+  if (result.rowCount === 0) {
+    throw new NotFoundError(`no bill found for order ${order_id}`);
+  }
+  return result.rows[0];
+}
+
+module.exports = { generateBill, getBillByOrderId, ValidationError, NotFoundError, ConflictError };
