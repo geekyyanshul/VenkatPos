@@ -5,7 +5,7 @@ class ValidationError extends Error { constructor(msg) { super(msg); this.name =
 class NotFoundError extends Error { constructor(msg) { super(msg); this.name = 'NotFoundError'; } }
 class ConflictError extends Error { constructor(msg) { super(msg); this.name = 'ConflictError'; } }
 
-async function generateBill(order_id) {
+async function generateBill(order_id, discount = null) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -45,19 +45,48 @@ async function generateBill(order_id) {
     for (const item of itemsResult.rows) {
       subtotal += parseFloat(item.unit_price) * item.quantity;
     }
-    const tax_amount = +(subtotal * tax_rate).toFixed(2);
-    const total = +(subtotal + tax_amount).toFixed(2);
+
+    let discount_type = null;
+    let discount_value = 0;
+    let discount_amount = 0;
+    if (discount && discount.type && discount.value) {
+      if (!['FLAT', 'PERCENTAGE'].includes(discount.type)) {
+        throw new ValidationError('discount.type must be FLAT or PERCENTAGE');
+      }
+      if (discount.value <= 0) {
+        throw new ValidationError('discount.value must be positive');
+      }
+      discount_type = discount.type;
+      discount_value = parseFloat(discount.value);
+      if (discount_type === 'FLAT') {
+        discount_amount = Math.min(discount_value, subtotal);
+      } else {
+        if (discount_value > 100) {
+          throw new ValidationError('percentage discount cannot exceed 100');
+        }
+        discount_amount = +(subtotal * (discount_value / 100)).toFixed(2);
+      }
+    }
+
+    const taxable = subtotal - discount_amount;
+    const tax_amount = +(taxable * tax_rate).toFixed(2);
+    const total = +(taxable + tax_amount).toFixed(2);
 
     const bill_id = uuidv4();
     await client.query(
-      `INSERT INTO bills (bill_id, order_id, subtotal, tax_amount, total, status)
-       VALUES ($1, $2, $3, $4, $5, 'UNPAID')`,
-      [bill_id, order_id, subtotal.toFixed(2), tax_amount, total]
+      `INSERT INTO bills (bill_id, order_id, subtotal, tax_amount, total, status, discount_type, discount_value)
+       VALUES ($1, $2, $3, $4, $5, 'UNPAID', $6, $7)`,
+      [bill_id, order_id, subtotal.toFixed(2), tax_amount, total, discount_type, discount_value]
     );
 
     await client.query('COMMIT');
 
-    return { bill_id, order_id, subtotal: subtotal.toFixed(2), tax_amount, total, status: 'UNPAID' };
+    return {
+      bill_id, order_id,
+      subtotal: subtotal.toFixed(2),
+      discount_type, discount_value, discount_amount,
+      tax_amount, total, status: 'UNPAID'
+    };
   } catch (err) {
     await client.query('ROLLBACK');
     if (err.code === '23505') {
@@ -68,16 +97,4 @@ async function generateBill(order_id) {
     client.release();
   }
 }
-
-async function getBillByOrderId(order_id) {
-  const result = await pool.query(
-    'SELECT * FROM bills WHERE order_id = $1',
-    [order_id]
-  );
-  if (result.rowCount === 0) {
-    throw new NotFoundError('bill not found for this order');
-  }
-  return result.rows[0];
-}
-
-module.exports = { generateBill, getBillByOrderId, ValidationError, NotFoundError, ConflictError };
+module.exports = { generateBill ,ValidationError, NotFoundError, ConflictError };

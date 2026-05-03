@@ -4,9 +4,9 @@ const billService = require('../services/billService');
 
 router.post('/', async (req, res) => {
   try {
-    const { order_id } = req.body;
+    const { order_id,discount } = req.body;
     if (!order_id) return res.status(400).json({ error: 'order_id required' });
-    const bill = await billService.generateBill(order_id);
+    const bill = await billService.generateBill(order_id,discount);
     res.status(201).json(bill);
   } catch (err) {
     handleError(res, err);
