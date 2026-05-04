@@ -45,12 +45,15 @@ export default function OrderDetail() {
     setLoading(true);
     Promise.all([
       getOrder(orderId),
-      getBillByOrder(orderId),
+      getBillByOrder(orderId).catch(err => {
+        if (err.status === 404 || /not found/i.test(err.message)) return null;
+        throw err;
+      }),
     ])
       .then(([o, b]) => { setOrder(o); setBill(b); })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
-  }, [orderId]);
+  }, [orderId]); // <-- this was missing, causing everything below to be trapped inside useEffect
 
   async function handleTransition(newStatus) {
     setActionError('');
@@ -144,7 +147,6 @@ export default function OrderDetail() {
         </div>
 
         <div className="order-detail-sidebar">
-          {/* Status actions */}
           {order.status !== 'PAID' && order.status !== 'CANCELLED' && (
             <div className="card">
               <h3>Actions</h3>
@@ -171,7 +173,6 @@ export default function OrderDetail() {
             </div>
           )}
 
-          {/* Bill section */}
           {billEnabled && !bill && (
             <BillCard
               orderId={order.order_id}
