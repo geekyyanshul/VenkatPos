@@ -1,4 +1,4 @@
-const BASE = '/api';
+const BASE = import.meta.env.VITE_API_URL || '/api';
 
 export async function listOrders(outletId) {
   const res = await fetch(`${BASE}/orders?outlet_id=${outletId}`);
