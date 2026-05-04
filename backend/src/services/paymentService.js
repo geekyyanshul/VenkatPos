@@ -1,4 +1,4 @@
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const { pool } = require('../db');
 
 class ValidationError extends Error { constructor(msg) { super(msg); this.name = 'ValidationError'; } }
@@ -51,7 +51,7 @@ async function recordPayment(input, idempotencyKey) {
       throw new ValidationError('amount does not match bill total ' + bill.total);
     }
 
-    const payment_id = uuidv4();
+    const payment_id = crypto.randomUUID();
     await client.query(
       `INSERT INTO payments (payment_id, bill_id, amount, method)
        VALUES ($1, $2, $3, $4)`,

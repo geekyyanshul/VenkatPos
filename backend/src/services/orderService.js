@@ -1,4 +1,4 @@
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const { pool } = require('../db');
 
 // ============================================================
@@ -77,7 +77,7 @@ async function createOrder(input) {
     }
 
     // Insert order
-    const order_id = uuidv4();
+    const order_id = crypto.randomUUID();
     await client.query(
       `INSERT INTO orders (order_id, outlet_id, order_type, table_number, status, version)
        VALUES ($1, $2, $3, $4, 'CREATED', 1)`,
