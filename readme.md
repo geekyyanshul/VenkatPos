@@ -34,7 +34,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full design document including 
 ### Install and run
 
 ```bash
-# Install dependencies
+# Install backend dependencies
 npm install
 
 # Create the database
@@ -44,18 +44,39 @@ createdb pos_system
 psql -f schema.sql pos_system
 psql -f seed.sql pos_system
 
-# Start the server
+# Start the backend server
 node src/server.js
 ```
 
-Server runs on `http://localhost:3000`.
+Backend runs on `http://localhost:3000`.
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend dev server runs on `http://localhost:5173` and proxies `/api/*` → `http://localhost:3000`.
+Open `http://localhost:5173` in a browser, select an outlet, and manage orders end-to-end.
 
 ## API
 
 ### Health check
 GET /health
 
+### Outlets
+**List outlets**
+GET /outlets
+
+**Get menu items for outlet**
+GET /outlets/:outlet_id/menu
+
 ### Orders
+**List orders for an outlet**
+GET /orders?outlet_id=1
+
 **Create order**
 POST /orders
 Body: {
@@ -86,6 +107,9 @@ Body: {
 }
 
 A bill can only be generated for orders in `READY` or `SERVED` state. Attempting to generate a duplicate bill returns 409.
+
+**Get bill for an order**
+GET /bills/by-order/:order_id
 
 ### Payments
 
