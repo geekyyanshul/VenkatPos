@@ -6,6 +6,7 @@ const billsRouter = require('./routes/bills');
 const paymentsRouter = require('./routes/payments');
 const outletsRouter = require('./routes/outlets');
 
+
 const app = express();
 
 // Render runs us behind a reverse proxy. Trusting it makes req.ip, req.protocol,
@@ -38,6 +39,8 @@ app.use('/outlets', outletsRouter);
 app.use('/orders', ordersRouter);
 app.use('/bills', billsRouter);
 app.use('/payments', paymentsRouter);
+app.use('/events', require('./routes/events'));
+app.use('/sync', require('./routes/sync'));
 
 // Global error handler — catches anything thrown in routes that wasn't already
 // caught by the route's own try/catch. Returns JSON so the frontend's
@@ -53,6 +56,14 @@ const PORT = process.env.PORT || 3000;
 // "works locally, mystery 502 on Render" bugs.
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`POS server running on port ${PORT}`);
+  
+  // Start the outbox worker in-process so its dispatched events
+  // reach the same eventBus instance the SSE endpoint subscribes to.
+  // (Cross-process event delivery would require a real broker — Redis pub/sub,
+  // Kafka, etc. — which is documented in ARCHITECTURE.md as the production
+  // evolution path.)
+  const { run: runWorker } = require('./worker');
+  runWorker();
 });
 
 // Graceful shutdown: when Render redeploys, it sends SIGTERM. We finish
