@@ -1,4 +1,4 @@
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const { pool } = require('../db');
 
 class ValidationError extends Error { constructor(msg) { super(msg); this.name = 'ValidationError'; } }
@@ -72,7 +72,7 @@ async function generateBill(order_id, discount = null) {
     const tax_amount = +(taxable * tax_rate).toFixed(2);
     const total = +(taxable + tax_amount).toFixed(2);
 
-    const bill_id = uuidv4();
+    const bill_id = crypto.randomUUID();
     await client.query(
       `INSERT INTO bills (bill_id, order_id, subtotal, tax_amount, total, status, discount_type, discount_value)
        VALUES ($1, $2, $3, $4, $5, 'UNPAID', $6, $7)`,
@@ -97,4 +97,15 @@ async function generateBill(order_id, discount = null) {
     client.release();
   }
 }
-module.exports = { generateBill ,ValidationError, NotFoundError, ConflictError };
+async function getBillByOrderId(order_id) {
+  const result = await pool.query(
+    'SELECT * FROM bills WHERE order_id = $1',
+    [order_id]
+  );
+  if (result.rowCount === 0) {
+    throw new NotFoundError(`no bill found for order ${order_id}`);
+  }
+  return result.rows[0];
+}
+
+module.exports = { generateBill, getBillByOrderId, ValidationError, NotFoundError, ConflictError };

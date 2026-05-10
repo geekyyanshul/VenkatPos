@@ -80,15 +80,17 @@ CREATE INDEX idx_order_items_order ON order_items(order_id);
 -- BILLS: one bill per order, generated when order is SERVED
 -- ============================================================
 CREATE TABLE bills (
-  bill_id       UUID PRIMARY KEY,
-  order_id      UUID NOT NULL UNIQUE REFERENCES orders(order_id),
+  bill_id        UUID PRIMARY KEY,
+  order_id       UUID NOT NULL UNIQUE REFERENCES orders(order_id),
   -- ☝️ UNIQUE here is critical: prevents two bills for the same order
-  subtotal      NUMERIC(10,2) NOT NULL,
-  tax_amount    NUMERIC(10,2) NOT NULL,
-  total         NUMERIC(10,2) NOT NULL,
-  status        TEXT NOT NULL DEFAULT 'UNPAID'
-                CHECK (status IN ('UNPAID', 'PAID')),
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  subtotal       NUMERIC(10,2) NOT NULL,
+  discount_type  TEXT CHECK (discount_type IN ('FLAT', 'PERCENTAGE')),
+  discount_value NUMERIC(10,2),
+  tax_amount     NUMERIC(10,2) NOT NULL,
+  total          NUMERIC(10,2) NOT NULL,
+  status         TEXT NOT NULL DEFAULT 'UNPAID'
+                 CHECK (status IN ('UNPAID', 'PAID')),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ============================================================

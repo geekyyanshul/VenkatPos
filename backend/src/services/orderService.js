@@ -1,5 +1,6 @@
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const { pool } = require('../db');
+const { recordEvent } = require('../outbox');
 
 // ============================================================
 // Custom error types so the route layer knows what HTTP code to send
@@ -77,13 +78,14 @@ async function createOrder(input) {
     }
 
     // Insert order
-    const order_id = uuidv4();
+    const order_id = crypto.randomUUID();
     await client.query(
       `INSERT INTO orders (order_id, outlet_id, order_type, table_number, status, version)
        VALUES ($1, $2, $3, $4, 'CREATED', 1)`,
       [order_id, outlet_id, order_type, table_number || null]
     );
 
+    // Insert items
     // Insert items
     for (const item of items) {
       await client.query(
@@ -92,9 +94,18 @@ async function createOrder(input) {
         [order_id, item.menu_item_id, item.quantity, priceMap[item.menu_item_id], item.notes || null]
       );
     }
-
+    // Record event in the SAME transaction as the order creation.
+    // The worker will dispatch this after the transaction commits.
+    await recordEvent(client, 'order.created', order_id, {
+      order_id,
+      outlet_id,
+      order_type,
+      table_number: table_number || null,
+      item_count: items.length,
+    });
     await client.query('COMMIT');
     return await getOrderById(order_id);
+
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -171,14 +182,24 @@ async function transitionOrder(order_id, new_status) {
       throw new ConflictError('order was modified concurrently, please retry');
     }
 
-    await client.query('COMMIT');
-
-    eventBus.emit('order.status_changed', {
-      order_id, from: current_status, to: new_status
+    // Record events in the SAME transaction (fixes the dual-write bug
+    // where eventBus.emit after COMMIT could be lost on a crash).
+    await recordEvent(client, 'order.status_changed', order_id, {
+      order_id,
+      from: current_status,
+      to: new_status,
     });
+
     if (new_status === 'CONFIRMED') {
-      eventBus.emit('order.confirmed', { order_id });
+      // Inventory was deducted above — emit a separate event so downstream
+      // consumers (analytics, restocking alerts) can react independently.
+      await recordEvent(client, 'inventory.deducted', order_id, {
+        order_id,
+        reason: 'order_confirmed',
+      });
     }
+
+    await client.query('COMMIT');
 
     return await getOrderById(order_id);
   } catch (err) {
