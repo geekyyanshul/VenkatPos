@@ -15,7 +15,7 @@ async function generateBill(order_id, discount = null) {
       [order_id]
     );
     if (orderResult.rowCount === 0) {
-      throw new NotFoundError('order not found');
+      throw new NotFoundError('Order milla nahi miya appka');
     }
     const { outlet_id, status } = orderResult.rows[0];
 
@@ -28,7 +28,7 @@ async function generateBill(order_id, discount = null) {
       [order_id]
     );
     if (existing.rowCount > 0) {
-      throw new ConflictError('bill already exists for this order');
+      throw new ConflictError('arey khaaa bill toh already ban chuka hai is order ka');
     }
 
     const taxResult = await client.query(
